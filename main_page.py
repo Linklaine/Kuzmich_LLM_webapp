@@ -74,6 +74,8 @@ evaluation_prompt = f"""Вы — эксперт-филолог. Объектив
 
 Выведите ТОЛЬКО JSON в указанном формате."""
 
+default_prompt="Вы — полезный и точный инструмент исправляющий текст. Проведите операции над текстом выше не добавляя ничего лишнего."
+
 client = OpenAI(base_url=f"http://{LM_STUDIO_HOST}:{LM_STUDIO_PORT}/v1", api_key=LM_STUDIO_KEY)
 
 
@@ -96,13 +98,13 @@ def get_available_models():
 def combine_system_prompts(selected_templates: list) -> str:
     """Объединяет несколько системных промптов в один"""
     if not selected_templates:
-        return "Вы — полезный помощник."
+        return default_prompt
     
     # Берем тексты выбранных промптов
     prompt_parts = [SYSTEM_PROMPTS[template] for template in selected_templates]
     
     # Объединяем их в четкую инструкцию
-    combined_prompt = "Вы — ассистент, который следует этим инструкциям:\n\n" + "\n".join(
+    combined_prompt = "Вы — точный инструмент по изменению текста, пожалуйста проведите операции над текстом выше учитывая все следующие инструкции не добавляя ничего лишнего:\n\n" + "\n".join(
         f"{i+1}. {part}" for i, part in enumerate(prompt_parts)
     )
     
@@ -157,6 +159,61 @@ def copy_button(text: str, button_label: str = "📋 Копировать"):
         </button>
     """, height=70)
 
+def evaluate_text(text):
+    try:
+        # Выполняем структурированный запрос
+        response = client.chat.completions.create(
+            model=st.session_state.selected_model,
+            messages=[{"role": "system", "content": evaluation_prompt},{"role": "user", "content": text}],
+            temperature=0.0,  # Низкая температура для консистентности
+            response_format=EVAL_STRUCTURE
+                                )
+        
+        # Парсим результат
+        evaluation_result = response.choices[0].message.content
+        scores = json.loads(evaluation_result)
+
+        # st.markdown(scores)
+        
+        # Отображаем результаты
+        # col1, col2, col3 = st.columns(3)
+        # col1.metric("Читаемость", f"{scores['readability']}/100")
+        # col2.metric("Качество", f"{scores['quality']}/100")  
+        # col3.metric("Креативность", f"{scores['creativity']}/100")
+        
+        # Сохраняем для дальнейшего использования
+        st.session_state.evaluation_scores = scores
+
+        if 'evaluation_scores' in st.session_state:
+            scores = st.session_state.evaluation_scores
+            
+            st.subheader("📊 Оценка качества результата")
+            
+            # Читаемость
+            st.markdown(f"**Грамматика:** {get_score_color(scores['grammar'])} {scores['grammar']}/100")
+            st.progress(scores['grammar'] / 100)
+
+            st.markdown(f"**Связность:** {get_score_color(scores['coherence'])} {scores['coherence']}/100")
+            st.progress(scores['coherence'] / 100)
+
+            st.markdown(f"**Понятность:** {get_score_color(scores['clarity'])} {scores['clarity']}/100")
+            st.progress(scores['clarity'] / 100)
+
+            st.markdown(f"**Увлекательность:** {get_score_color(scores['engagement'])} {scores['engagement']}/100")
+            st.progress(scores['engagement'] / 100)
+        
+    except Exception as e:
+        st.error(f"Ошибка при оценке: {str(e)}")
+
+def get_score_color(score):
+
+        if score >= 80:
+            return "🟢"  # Зеленый
+        elif score >= 60:
+            return "🟡"  # Желтый  
+        else:
+            return "🔴"  # Красный    
+
 st.set_page_config(
     page_title="LinguaFlow",
     page_icon="✍️",  # Можно использовать emoji или путь к файлу
@@ -189,7 +246,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 SYSTEM_PROMPTS = config.get("prompts", {
-        "Базовая помощь": "Вы — полезный и точный помощник."
+        "Базовая помощь": default_prompt
     })
 
 # 1. Инициализация состояния сессии (в начале скрипта)
@@ -217,6 +274,7 @@ selected_model = st.selectbox(
 
 # 3. Сворачиваемый блок
 with st.expander("⚙️ Системные инструкции"):
+    
     selected_templates = st.multiselect(
         "Инструкции:",
         options=list(SYSTEM_PROMPTS.keys()),
@@ -239,61 +297,10 @@ user_input = st.text_area(
     key="user_input")
 
 if st.session_state.get("user_input"):
-    def get_score_color(score):
-        if score >= 80:
-            return "🟢"  # Зеленый
-        elif score >= 60:
-            return "🟡"  # Желтый  
-        else:
-            return "🔴"  # Красный
     if st.button("📊 Оценить качество исходного текста"):
         with st.spinner("Оценка качества..."):
             original_text = st.session_state.get("user_input", "")
-            try:
-                # Выполняем структурированный запрос
-                response = client.chat.completions.create(
-                    model=st.session_state.selected_model,
-                    messages=[{"role": "system", "content": evaluation_prompt},{"role": "user", "content": original_text}],
-                    temperature=0.1,  # Низкая температура для консистентности
-                    response_format=EVAL_STRUCTURE
-                                        )
-                
-                # Парсим результат
-                evaluation_result = response.choices[0].message.content
-                scores = json.loads(evaluation_result)
-
-                # st.markdown(scores)
-                
-                # Отображаем результаты
-                # col1, col2, col3 = st.columns(3)
-                # col1.metric("Читаемость", f"{scores['readability']}/100")
-                # col2.metric("Качество", f"{scores['quality']}/100")  
-                # col3.metric("Креативность", f"{scores['creativity']}/100")
-                
-                # Сохраняем для дальнейшего использования
-                st.session_state.evaluation_scores = scores
-
-                if 'evaluation_scores' in st.session_state:
-                    scores = st.session_state.evaluation_scores
-                    
-                    st.subheader("📊 Оценка качества результата")
-                    
-                    # Читаемость
-                    st.markdown(f"**Грамматика:** {get_score_color(scores['grammar'])} {scores['grammar']}/100")
-                    st.progress(scores['grammar'] / 100)
-
-                    st.markdown(f"**Связность:** {get_score_color(scores['coherence'])} {scores['coherence']}/100")
-                    st.progress(scores['coherence'] / 100)
-
-                    st.markdown(f"**Понятность:** {get_score_color(scores['clarity'])} {scores['clarity']}/100")
-                    st.progress(scores['clarity'] / 100)
-
-                    st.markdown(f"**Увлекательность:** {get_score_color(scores['engagement'])} {scores['engagement']}/100")
-                    st.progress(scores['engagement'] / 100)
-                
-            except Exception as e:
-                st.error(f"Ошибка при оценке: {str(e)}")
-
+            evaluate_text(original_text)
 
 if st.button("📤 Отправить на обработку", type="primary"):
     if not user_input.strip():
@@ -306,8 +313,8 @@ if st.button("📤 Отправить на обработку", type="primary"):
             
             # Формируем сообщения для модели
             messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": user_prompt},
+                {"role": "user", "content": system_prompt}
             ]
             
             try:
@@ -315,7 +322,7 @@ if st.button("📤 Отправить на обработку", type="primary"):
                 stream = client.chat.completions.create(
                     model=st.session_state.selected_model,
                     messages=messages,
-                    temperature=0.5,
+                    temperature=0.1,
                     max_tokens=4000,
                     stream=True
                 )
@@ -350,62 +357,10 @@ if "processed_text" in st.session_state and st.session_state.processed_text:
 
 # После отображения результата обработки ПРОВЕРИТЬ
 if st.session_state.get("last_result"):
-    def get_score_color(score):
-        if score >= 80:
-            return "🟢"  # Зеленый
-        elif score >= 60:
-            return "🟡"  # Желтый  
-        else:
-            return "🔴"  # Красный
     if st.button("📊 Оценить качество сгенерированного текста"):
         with st.spinner("Оценка качества..."):
-            original_text = st.session_state.get("user_input", "")
             processed_text = st.session_state.last_result
-            
-            try:
-                # Выполняем структурированный запрос
-                response = client.chat.completions.create(
-                    model=st.session_state.selected_model,
-                    messages=[{"role": "system", "content": evaluation_prompt},{"role": "user", "content": processed_text}],
-                    temperature=0.1,  # Низкая температура для консистентности
-                    response_format=EVAL_STRUCTURE
-                                        )
-                
-                # Парсим результат
-                evaluation_result = response.choices[0].message.content
-                scores = json.loads(evaluation_result)
-
-                # st.markdown(scores)
-                
-                # Отображаем результаты
-                # col1, col2, col3 = st.columns(3)
-                # col1.metric("Читаемость", f"{scores['readability']}/100")
-                # col2.metric("Качество", f"{scores['quality']}/100")  
-                # col3.metric("Креативность", f"{scores['creativity']}/100")
-                
-                # Сохраняем для дальнейшего использования
-                st.session_state.evaluation_scores = scores
-
-                if 'evaluation_scores' in st.session_state:
-                    scores = st.session_state.evaluation_scores
-                    
-                    st.subheader("📊 Оценка качества результата")
-                    
-                    # Читаемость
-                    st.markdown(f"**Грамматика:** {get_score_color(scores['grammar'])} {scores['grammar']}/100")
-                    st.progress(scores['grammar'] / 100)
-
-                    st.markdown(f"**Связность:** {get_score_color(scores['coherence'])} {scores['coherence']}/100")
-                    st.progress(scores['coherence'] / 100)
-
-                    st.markdown(f"**Понятность:** {get_score_color(scores['clarity'])} {scores['clarity']}/100")
-                    st.progress(scores['clarity'] / 100)
-
-                    st.markdown(f"**Увлекательность:** {get_score_color(scores['engagement'])} {scores['engagement']}/100")
-                    st.progress(scores['engagement'] / 100)
-                
-            except Exception as e:
-                st.error(f"Ошибка при оценке: {str(e)}")
+            evaluate_text(processed_text)
 
 st.divider()
 st.subheader("🔍 Семантический поиск")
