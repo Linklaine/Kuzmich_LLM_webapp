@@ -27,6 +27,7 @@ DEFAULT_MODEL = config["app"]["default_model"]
 HISTORY_FILE = config["app"]["history_file_name"]
 MAX_HISTORY_ITEMS = config["app"]["history_length"]
 
+default_prompt="Вы — полезный и точный инструмент исправляющий текст. Проведите операции над текстом выше не добавляя ничего лишнего."
 EVAL_STRUCTURE={
                         "type": "json_schema",
                         "json_schema": {
@@ -73,8 +74,13 @@ evaluation_prompt = f"""Вы — эксперт-филолог. Объектив
 - engagement: увлекательность и выразительность текста
 
 Выведите ТОЛЬКО JSON в указанном формате."""
+SYSTEM_PROMPTS = config.get("prompts", {
+        "Базовая помощь": default_prompt
+    })
+MAIN_PROMPTS=["Перевод  RU-EN","Перевод EN-RU","Академический стиль","Деловая переписка"]
+ADDITIONAL_PROMPTS = [p for p in SYSTEM_PROMPTS.keys() if p not in MAIN_PROMPTS]
 
-default_prompt="Вы — полезный и точный инструмент исправляющий текст. Проведите операции над текстом выше не добавляя ничего лишнего."
+
 
 client = OpenAI(base_url=f"http://{LM_STUDIO_HOST}:{LM_STUDIO_PORT}/v1", api_key=LM_STUDIO_KEY)
 
@@ -245,19 +251,31 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-SYSTEM_PROMPTS = config.get("prompts", {
-        "Базовая помощь": default_prompt
-    })
+
 
 # 1. Инициализация состояния сессии (в начале скрипта)
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = SYSTEM_PROMPTS["По умолчанию"]
 
 # 2. Функция-коллбэк для обновления промпта
-def update_combined_prompt():
+def update_combined_prompt(prompt_name=None, new_value=None):
     """Обновляет комбинированный промпт при изменении выбора"""
-    selected = st.session_state.prompt_templates
-    combined = combine_system_prompts(selected)
+
+    # Если вызвано из тумблера — обновляем конкретное значение
+    if prompt_name is not None and new_value is not None:
+        st.session_state[f"toggle_{prompt_name}"] = new_value
+        # print(f"🔄 Тумблер: {prompt_name} → {new_value}")
+    else:
+        # print(f"🔄 Мультиселект: изменение")
+        pass
+
+    main_selected = [p for p in MAIN_PROMPTS if st.session_state.get(f"toggle_{p}", False)]
+    additional_selected = st.session_state.get("additional_prompts_select", [])
+    
+    combined = combine_system_prompts(main_selected + additional_selected)
+    #print(st.session_state)
+    # print(st.session_state)
+
     st.session_state.system_prompt = combined
 
 # Получаем список моделей (выполняется при каждом запуске/обновлении)
@@ -274,15 +292,50 @@ selected_model = st.selectbox(
 
 # 3. Сворачиваемый блок
 with st.expander("⚙️ Системные инструкции"):
+
+    # --- Тумблеры для основных промптов ---
+    st.markdown("**Основные инструкции:**")
     
-    selected_templates = st.multiselect(
-        "Инструкции:",
-        options=list(SYSTEM_PROMPTS.keys()),
-        default=["По умолчанию"],
-        key="prompt_templates",
-        on_change=update_combined_prompt
-    )
+    # Отображение тумблеров в сетке
+    cols = st.columns(2)
+    for idx, prompt_name in enumerate(MAIN_PROMPTS):
+        col = cols[idx % 2]
+        with col:
+            toggle_key = f"toggle_{prompt_name}"
+            # Инициализируем если нет
+            if toggle_key not in st.session_state:
+                st.session_state[toggle_key] = False
+            
+            # Получаем ТЕКУЩЕЕ значение (до переключения)
+            current_value = st.session_state[toggle_key]
+            is_active = st.toggle(
+                prompt_name,
+                value=current_value,
+                key=toggle_key,
+                help=SYSTEM_PROMPTS.get(prompt_name, "")[:100] + "...",
+                on_change=update_combined_prompt,
+                args=(prompt_name, not current_value)
+            )
     
+    st.divider()
+    
+    # --- Мультиселект для дополнительных ---
+    if ADDITIONAL_PROMPTS:
+        st.markdown("**Дополнительные инструкции:**")
+        additional_selected = st.multiselect(
+            "Выберите из списка:",
+            options=ADDITIONAL_PROMPTS,
+            default=[],
+            key="additional_prompts_select",
+            help="Эти инструкции добавятся к основным",
+            on_change=update_combined_prompt
+        )
+    else:
+        additional_selected = []
+    
+    st.divider()
+    
+    # --- Предпросмотр ---
     # Редактируемое поле (автоматически обновляется)
     system_prompt = st.text_area(
         "Комбинированный промпт:",
@@ -290,6 +343,7 @@ with st.expander("⚙️ Системные инструкции"):
         height=150,
         key="system_prompt"
     )
+    # print(st.session_state.system_prompt)
 
 user_input = st.text_area(
     "Введите ваш текст",
@@ -319,6 +373,7 @@ if st.button("📤 Отправить на обработку", type="primary"):
             
             try:
                 # Выполняем запрос к модели (ваш существующий код)
+                print(f"Отправлен запрос с промптом:\n{messages}")
                 stream = client.chat.completions.create(
                     model=st.session_state.selected_model,
                     messages=messages,

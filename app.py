@@ -8,7 +8,7 @@ settings=st.Page("settings.py", title="Настройки")
 prompts=st.Page("prompts.py", title="Промпты")
 
 # Set up navigation
-pg = st.navigation([main_page, about_us,historydl,settings,prompts])
+pg = st.navigation([main_page, about_us,historydl,settings,prompts],position="top")
 
 # Run the selected page
 pg.run()
