@@ -222,7 +222,7 @@ def get_score_color(score):
 
 st.set_page_config(
     page_title="LinguaFlow",
-    page_icon="✍️",  # Можно использовать emoji или путь к файлу
+    page_icon="app\static\logo.svg",  # Можно использовать emoji или путь к файлу
     layout="wide"
 )
 
@@ -241,9 +241,19 @@ st.set_page_config(
 #     </style>
 # """, unsafe_allow_html=True)
 
-st.markdown("""
+import base64
+from pathlib import Path
+
+# Загрузка и кодирование SVG
+svg_path = Path("app\static\logo.svg")
+with open(svg_path, "rb") as f:
+    svg_data = base64.b64encode(f.read()).decode()
+    svg_base64 = f"data:image/svg+xml;base64,{svg_data}"
+
+# Использование в HTML
+st.markdown(f"""
 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
-    <span style="font-size: 1.8em;">✍️</span>
+    <img src="{svg_base64}" alt="LinguaFlow" style="width: 48px; height: 48px;">
     <div>
         <h2 style="margin: 0; font-size: 1.6em;">LinguaFlow</h2>
         <p style="margin: 3px 0 0 0; color: #666; font-size: 0.9em;">Поддержка письма</p>

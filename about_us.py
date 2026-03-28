@@ -1,10 +1,23 @@
 import streamlit as st
+from pathlib import Path
+import base64
 
 def show_about_page():
-    st.markdown("""
+    st.set_page_config(
+    page_title="LinguaFlow",
+    page_icon="app\static\logo.svg",  # Можно использовать emoji или путь к файлу
+    layout="wide"
+    )
+    # === ЗАГРУЗКА ЛОГОТИПА (base64) ===
+    svg_path = Path("app\static\logo.svg")
+    with open(svg_path, "rb") as f:
+        svg_data = base64.b64encode(f.read()).decode()
+        svg_base64 = f"data:image/svg+xml;base64,{svg_data}"
+    st.markdown(f"""
     <div style="text-align: center; margin-bottom: 30px;">
-        <h1>О проекте LinguaFlow</h1>
-        <p style="color: #666; font-size: 1.1em; max-width: 800px; margin: 0 auto;">
+        <img src="{svg_base64}" alt="LinguaFlow" style="width: 80px; height: 80px; margin-bottom: 15px;">
+        <h1 style="margin: 0; font-size: 2em;">О проекте LinguaFlow</h1>
+        <p style="color: #666; font-size: 1.1em; max-width: 800px; margin: 15px auto 0 auto;">
             Интеллектуальный помощник для работы с текстом на русском и английском языках
         </p>
     </div>
