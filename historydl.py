@@ -118,7 +118,7 @@ def show_history_page():
         st.download_button(
             label="📤 Скачать выбранную историю (JSON)",
             data=export_json,
-            file_name=f"linguaflow_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            file_name=f"Кузьмич_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json"
         )
     else:

@@ -77,7 +77,7 @@ evaluation_prompt = f"""Вы — эксперт-филолог. Объектив
 SYSTEM_PROMPTS = config.get("prompts", {
         "Базовая помощь": default_prompt
     })
-MAIN_PROMPTS=["Перевод  RU-EN","Перевод EN-RU","Академический стиль","Деловая переписка"]
+MAIN_PROMPTS=["Перевод  RU-EN","Перевод EN-RU","Академический стиль","Деловая переписка","Структуризация","Сокращение","Энергичный текст","Исправление"]
 ADDITIONAL_PROMPTS = [p for p in SYSTEM_PROMPTS.keys() if p not in MAIN_PROMPTS]
 
 
@@ -220,9 +220,10 @@ def get_score_color(score):
         else:
             return "🔴"  # Красный    
 
+
 st.set_page_config(
-    page_title="LinguaFlow",
-    page_icon="app\static\logo.svg",  # Можно использовать emoji или путь к файлу
+    page_title="Кузьмич",
+    page_icon=r"app\static\logo.svg",  # Можно использовать emoji или путь к файлу
     layout="wide"
 )
 
@@ -245,7 +246,7 @@ import base64
 from pathlib import Path
 
 # Загрузка и кодирование SVG
-svg_path = Path("app\static\logo.svg")
+svg_path = Path(r"app\static\logo.svg")
 with open(svg_path, "rb") as f:
     svg_data = base64.b64encode(f.read()).decode()
     svg_base64 = f"data:image/svg+xml;base64,{svg_data}"
@@ -253,9 +254,9 @@ with open(svg_path, "rb") as f:
 # Использование в HTML
 st.markdown(f"""
 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
-    <img src="{svg_base64}" alt="LinguaFlow" style="width: 48px; height: 48px;">
+    <img src="{svg_base64}" alt="Кузьмич" style="width: 48px; height: 48px;">
     <div>
-        <h2 style="margin: 0; font-size: 1.6em;">LinguaFlow</h2>
+        <h2 style="margin: 0; font-size: 1.6em;">Кузьмич</h2>
         <p style="margin: 3px 0 0 0; color: #666; font-size: 0.9em;">Поддержка письма</p>
     </div>
 </div>
@@ -327,8 +328,6 @@ with st.expander("⚙️ Системные инструкции"):
                 args=(prompt_name, not current_value)
             )
     
-    st.divider()
-    
     # --- Мультиселект для дополнительных ---
     if ADDITIONAL_PROMPTS:
         st.markdown("**Дополнительные инструкции:**")
@@ -342,8 +341,6 @@ with st.expander("⚙️ Системные инструкции"):
         )
     else:
         additional_selected = []
-    
-    st.divider()
     
     # --- Предпросмотр ---
     # Редактируемое поле (автоматически обновляется)
@@ -377,8 +374,8 @@ if st.button("📤 Отправить на обработку", type="primary"):
             
             # Формируем сообщения для модели
             messages = [
-                {"role": "system", "content": user_prompt},
-                {"role": "user", "content": system_prompt}
+                {"role": "user", "content": user_prompt},
+                {"role": "system", "content": system_prompt}
             ]
             
             try:
